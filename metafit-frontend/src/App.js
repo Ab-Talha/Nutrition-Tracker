@@ -4,12 +4,13 @@ import { useAuth } from './hooks/useAuth';
 import { LoadingSpinner } from './components/Common/LoadingSpinner';
 import { LoginPage } from './components/Auth/LoginPage';
 import { RegisterPage } from './components/Auth/RegisterPage';
-import SignupWizard from './components/Auth/SignupPage';
 import MealEntryApp from './components/MealEntry/MealEntryApp';
+import Dashboard from './components/Dashboard/Dashboard';
 
 const AppContent = () => {
   const { user, loading } = useAuth();
-  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', or 'signup-wizard'
+  const [authMode, setAuthMode] = useState('login');
+  const [currentPage, setCurrentPage] = useState('meal-entry'); // Start with meal-entry
 
   if (loading) {
     return <LoadingSpinner />;
@@ -26,9 +27,7 @@ const AppContent = () => {
         padding: '20px'
       }}>
         {authMode === 'login' ? (
-          <LoginPage onSwitchToRegister={() => setAuthMode('signup-wizard')} />
-        ) : authMode === 'signup-wizard' ? (
-          <SignupWizard onSignupComplete={() => setAuthMode('login')} />
+          <LoginPage onSwitchToRegister={() => setAuthMode('register')} />
         ) : (
           <RegisterPage onSwitchToLogin={() => setAuthMode('login')} />
         )}
@@ -36,7 +35,12 @@ const AppContent = () => {
     );
   }
 
-  return <MealEntryApp user={user} />;
+  // Render based on current page
+  return currentPage === 'dashboard' ? (
+    <Dashboard user={user} onNavigate={setCurrentPage} />
+  ) : (
+    <MealEntryApp user={user} onNavigate={setCurrentPage} />
+  );
 };
 
 export default function App() {
