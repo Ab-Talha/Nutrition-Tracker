@@ -36,3 +36,47 @@ class UserDetailSerializer(serializers.Serializer):
     Name = serializers.CharField()
     ProfilePicture = serializers.CharField(allow_null=True)
     CreatedAt = serializers.DateTimeField(read_only=True)
+
+
+class PhysicalInfoSerializer(serializers.Serializer):
+    """Serializer for physical information"""
+    PhysicalInfoID = serializers.IntegerField(read_only=True)
+    UserID = serializers.IntegerField(read_only=True)
+    DOB = serializers.DateField()
+    Gender = serializers.CharField()
+    Height = serializers.DecimalField(max_digits=5, decimal_places=2)
+    ActivityLevel = serializers.CharField()
+    Goal = serializers.CharField()
+    TargetWeight = serializers.DecimalField(max_digits=5, decimal_places=2)
+    BodyFat = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
+    Lifestyle = serializers.CharField(allow_null=True)
+    CurrentWeight = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
+
+
+class UserProfileSerializer(serializers.Serializer):
+    """Serializer for combined user and physical info"""
+    user = serializers.SerializerMethodField()
+    physicalInfo = serializers.SerializerMethodField()
+    bmi = serializers.SerializerMethodField()
+    
+    def get_user(self, obj):
+        return {
+            'UserID': obj['user']['UserID'],
+            'Name': obj['user']['Name'],
+            'Username': obj['user']['Username'],
+            'Email': obj['user']['Email']
+        }
+    
+    def get_physicalInfo(self, obj):
+        return obj['physicalInfo']
+    
+    def get_bmi(self, obj):
+        """Calculate BMI from height and weight"""
+        height = float(obj['physicalInfo'].get('Height', 0))
+        weight = float(obj['physicalInfo'].get('CurrentWeight', 0))
+        
+        if height > 0 and weight > 0:
+            height_m = height / 100
+            bmi = weight / (height_m * height_m)
+            return round(bmi, 1)
+        return None

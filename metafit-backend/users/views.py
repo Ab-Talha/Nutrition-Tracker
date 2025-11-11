@@ -367,3 +367,628 @@ class CheckEmailView(APIView):
                 'available': None,
                 'message': 'Error checking email'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+# Add at the end of users/views.py
+
+# users/views.py - Physical Info Views (Corrected for proper table structure)
+
+class PhysicalInfoView(APIView):
+    """Handle physical information retrieval and updates"""
+    
+    def get(self, request, user_id):
+        """Get physical info for user with latest weight"""
+        try:
+            # Get physical info from userphysicalinfo table
+            query = """
+                SELECT PhysicalInfoID, UserID, DOB, Gender, Height, 
+                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle
+                FROM userphysicalinfo
+                WHERE UserID = %s
+            """
+            physical_info = DatabaseHelper.execute_query(query, (user_id,), fetch_one=True)
+            
+            if not physical_info:
+                return Response({
+                    'success': False,
+                    'message': 'Physical information not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get latest weight from userweight table
+            weight_query = """
+                SELECT Weight, DateTime, Notes
+                FROM userweight
+                WHERE UserID = %s
+                ORDER BY DateTime DESC
+                LIMIT 1
+            """
+            latest_weight = DatabaseHelper.execute_query(weight_query, (user_id,), fetch_one=True)
+            
+            # Format response with proper type conversions
+            response_data = {
+                'PhysicalInfoID': physical_info['PhysicalInfoID'],
+                'UserID': physical_info['UserID'],
+                'DOB': str(physical_info['DOB']) if physical_info.get('DOB') else None,
+                'Gender': physical_info['Gender'],
+                'Height': float(physical_info['Height']) if physical_info.get('Height') else None,
+                'CurrentWeight': float(latest_weight['Weight']) if latest_weight and latest_weight.get('Weight') else None,
+                'WeightLastUpdated': str(latest_weight['DateTime']) if latest_weight and latest_weight.get('DateTime') else None,
+                'TargetWeight': float(physical_info['TargetWeight']) if physical_info.get('TargetWeight') else None,
+                'ActivityLevel': physical_info['ActivityLevel'],
+                'Goal': physical_info['Goal'],
+                'BodyFat': float(physical_info['BodyFat']) if physical_info.get('BodyFat') else None,
+                'Lifestyle': physical_info.get('Lifestyle')
+            }
+            
+            return Response({
+                'success': True,
+                'data': response_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching physical info: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def put(self, request, user_id):
+        """Update physical information"""
+        try:
+            # Check if physical info exists
+            check_query = "SELECT PhysicalInfoID FROM userphysicalinfo WHERE UserID = %s"
+            existing = DatabaseHelper.execute_query(check_query, (user_id,), fetch_one=True)
+            
+            if not existing:
+                return Response({
+                    'success': False,
+                    'message': 'Physical information not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Prepare update fields for userphysicalinfo table
+            update_fields = []
+            params = []
+            
+            if 'DOB' in request.data:
+                update_fields.append("DOB = %s")
+                params.append(request.data['DOB'])
+            
+            if 'Gender' in request.data:
+                update_fields.append("Gender = %s")
+                params.append(request.data['Gender'])
+            
+            if 'Height' in request.data:
+                update_fields.append("Height = %s")
+                params.append(request.data['Height'])
+            
+            if 'TargetWeight' in request.data:
+                update_fields.append("TargetWeight = %s")
+                params.append(request.data['TargetWeight'])
+            
+            if 'BodyFat' in request.data:
+                update_fields.append("BodyFat = %s")
+                params.append(request.data['BodyFat'])
+            
+            if 'ActivityLevel' in request.data:
+                update_fields.append("ActivityLevel = %s")
+                params.append(request.data['ActivityLevel'])
+            
+            if 'Goal' in request.data:
+                update_fields.append("Goal = %s")
+                params.append(request.data['Goal'])
+            
+            if 'Lifestyle' in request.data:
+                update_fields.append("Lifestyle = %s")
+                params.append(request.data['Lifestyle'])
+            
+            # Update physical info if there are fields to update
+            if update_fields:
+                params.append(user_id)
+                update_query = f"""
+                    UPDATE userphysicalinfo
+                    SET {', '.join(update_fields)}
+                    WHERE UserID = %s
+                """
+                DatabaseHelper.execute_update(update_query, params)
+            
+            # Handle CurrentWeight separately - insert into userweight table
+            if 'CurrentWeight' in request.data:
+                weight_insert_query = """
+                    INSERT INTO userweight (UserID, DateTime, Weight, Notes)
+                    VALUES (%s, NOW(), %s, %s)
+                """
+                notes = request.data.get('WeightNotes', 'Updated via API')
+                DatabaseHelper.execute_insert(weight_insert_query, (user_id, request.data['CurrentWeight'], notes))
+            
+            if not update_fields and 'CurrentWeight' not in request.data:
+                return Response({
+                    'success': False,
+                    'message': 'No fields to update'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Fetch updated data
+            fetch_query = """
+                SELECT PhysicalInfoID, UserID, DOB, Gender, Height, 
+                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle
+                FROM userphysicalinfo
+                WHERE UserID = %s
+            """
+            updated_info = DatabaseHelper.execute_query(fetch_query, (user_id,), fetch_one=True)
+            
+            # Get latest weight
+            weight_query = """
+                SELECT Weight, DateTime, Notes
+                FROM userweight
+                WHERE UserID = %s
+                ORDER BY DateTime DESC
+                LIMIT 1
+            """
+            latest_weight = DatabaseHelper.execute_query(weight_query, (user_id,), fetch_one=True)
+            
+            # Format response
+            response_data = {
+                'PhysicalInfoID': updated_info['PhysicalInfoID'],
+                'UserID': updated_info['UserID'],
+                'DOB': str(updated_info['DOB']) if updated_info.get('DOB') else None,
+                'Gender': updated_info['Gender'],
+                'Height': float(updated_info['Height']) if updated_info.get('Height') else None,
+                'CurrentWeight': float(latest_weight['Weight']) if latest_weight and latest_weight.get('Weight') else None,
+                'WeightLastUpdated': str(latest_weight['DateTime']) if latest_weight and latest_weight.get('DateTime') else None,
+                'TargetWeight': float(updated_info['TargetWeight']) if updated_info.get('TargetWeight') else None,
+                'ActivityLevel': updated_info['ActivityLevel'],
+                'Goal': updated_info['Goal'],
+                'BodyFat': float(updated_info['BodyFat']) if updated_info.get('BodyFat') else None,
+                'Lifestyle': updated_info.get('Lifestyle')
+            }
+            
+            return Response({
+                'success': True,
+                'message': 'Physical information updated',
+                'data': response_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error updating physical info: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def post(self, request, user_id):
+        """Create physical information for user"""
+        try:
+            # Check if user exists
+            user_query = "SELECT UserID FROM userdetails WHERE UserID = %s"
+            user_exists = DatabaseHelper.execute_query(user_query, (user_id,), fetch_one=True)
+            
+            if not user_exists:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if physical info already exists
+            check_query = "SELECT PhysicalInfoID FROM userphysicalinfo WHERE UserID = %s"
+            existing = DatabaseHelper.execute_query(check_query, (user_id,), fetch_one=True)
+            
+            if existing:
+                return Response({
+                    'success': False,
+                    'message': 'Physical information already exists for this user'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate required fields
+            required_fields = ['DOB', 'Gender', 'Height', 'ActivityLevel', 'Goal', 'TargetWeight']
+            missing_fields = [field for field in required_fields if field not in request.data]
+            
+            if missing_fields:
+                return Response({
+                    'success': False,
+                    'message': f'Missing required fields: {", ".join(missing_fields)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Insert physical info into userphysicalinfo table
+            insert_query = """
+                INSERT INTO userphysicalinfo 
+                (UserID, DOB, Gender, Height, ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            params = (
+                user_id,
+                request.data['DOB'],
+                request.data['Gender'],
+                request.data['Height'],
+                request.data['ActivityLevel'],
+                request.data['Goal'],
+                request.data['TargetWeight'],
+                request.data.get('BodyFat'),
+                request.data.get('Lifestyle')
+            )
+            
+            physical_info_id = DatabaseHelper.execute_insert(insert_query, params)
+            
+            if not physical_info_id:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to create physical information'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Insert initial weight if provided
+            if 'CurrentWeight' in request.data:
+                weight_insert_query = """
+                    INSERT INTO userweight (UserID, DateTime, Weight, Notes)
+                    VALUES (%s, NOW(), %s, %s)
+                """
+                notes = request.data.get('WeightNotes', 'Initial weight entry')
+                DatabaseHelper.execute_insert(weight_insert_query, (user_id, request.data['CurrentWeight'], notes))
+            
+            # Fetch created data
+            fetch_query = """
+                SELECT PhysicalInfoID, UserID, DOB, Gender, Height, 
+                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle
+                FROM userphysicalinfo
+                WHERE PhysicalInfoID = %s
+            """
+            created_info = DatabaseHelper.execute_query(fetch_query, (physical_info_id,), fetch_one=True)
+            
+            # Get latest weight
+            weight_query = """
+                SELECT Weight, DateTime, Notes
+                FROM userweight
+                WHERE UserID = %s
+                ORDER BY DateTime DESC
+                LIMIT 1
+            """
+            latest_weight = DatabaseHelper.execute_query(weight_query, (user_id,), fetch_one=True)
+            
+            response_data = {
+                'PhysicalInfoID': created_info['PhysicalInfoID'],
+                'UserID': created_info['UserID'],
+                'DOB': str(created_info['DOB']),
+                'Gender': created_info['Gender'],
+                'Height': float(created_info['Height']),
+                'CurrentWeight': float(latest_weight['Weight']) if latest_weight and latest_weight.get('Weight') else None,
+                'WeightLastUpdated': str(latest_weight['DateTime']) if latest_weight and latest_weight.get('DateTime') else None,
+                'TargetWeight': float(created_info['TargetWeight']),
+                'ActivityLevel': created_info['ActivityLevel'],
+                'Goal': created_info['Goal'],
+                'BodyFat': float(created_info['BodyFat']) if created_info.get('BodyFat') else None,
+                'Lifestyle': created_info.get('Lifestyle')
+            }
+            
+            return Response({
+                'success': True,
+                'message': 'Physical information created',
+                'data': response_data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating physical info: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserProfileView(APIView):
+    """Get combined user and physical information"""
+    
+    def get(self, request, user_id):
+        """Get user profile with physical info and calculated BMI"""
+        try:
+            # Get user details
+            user_query = """
+                SELECT UserID, Username, Email, Name, ProfilePicture
+                FROM userdetails
+                WHERE UserID = %s
+            """
+            user_data = DatabaseHelper.execute_query(user_query, (user_id,), fetch_one=True)
+            
+            if not user_data:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get physical info from userphysicalinfo table
+            physical_query = """
+                SELECT PhysicalInfoID, UserID, DOB, Gender, Height, 
+                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle
+                FROM userphysicalinfo
+                WHERE UserID = %s
+            """
+            physical_data = DatabaseHelper.execute_query(physical_query, (user_id,), fetch_one=True)
+            
+            if not physical_data:
+                return Response({
+                    'success': False,
+                    'message': 'Physical information not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get latest weight from userweight table
+            weight_query = """
+                SELECT Weight, DateTime
+                FROM userweight
+                WHERE UserID = %s
+                ORDER BY DateTime DESC
+                LIMIT 1
+            """
+            latest_weight = DatabaseHelper.execute_query(weight_query, (user_id,), fetch_one=True)
+            
+            # Calculate BMI
+            height = float(physical_data.get('Height', 0)) if physical_data.get('Height') else 0
+            current_weight = float(latest_weight['Weight']) if latest_weight and latest_weight.get('Weight') else 0
+            
+            bmi = None
+            if height > 0 and current_weight > 0:
+                height_m = height / 100
+                bmi = round(current_weight / (height_m * height_m), 1)
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'user': {
+                        'UserID': user_data['UserID'],
+                        'Name': user_data['Name'],
+                        'Username': user_data['Username'],
+                        'Email': user_data['Email'],
+                        'ProfilePicture': user_data.get('ProfilePicture')
+                    },
+                    'physicalInfo': {
+                        'PhysicalInfoID': physical_data['PhysicalInfoID'],
+                        'DOB': str(physical_data['DOB']) if physical_data.get('DOB') else None,
+                        'Gender': physical_data['Gender'],
+                        'Height': float(physical_data['Height']) if physical_data.get('Height') else None,
+                        'CurrentWeight': current_weight if current_weight > 0 else None,
+                        'WeightLastUpdated': str(latest_weight['DateTime']) if latest_weight and latest_weight.get('DateTime') else None,
+                        'TargetWeight': float(physical_data['TargetWeight']) if physical_data.get('TargetWeight') else None,
+                        'ActivityLevel': physical_data['ActivityLevel'],
+                        'Goal': physical_data['Goal'],
+                        'BodyFat': float(physical_data['BodyFat']) if physical_data.get('BodyFat') else None,
+                        'Lifestyle': physical_data.get('Lifestyle'),
+                        'BMI': bmi
+                    }
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching user profile: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WeightHistoryView(APIView):
+    """Handle weight history tracking"""
+    
+    def get(self, request, user_id):
+        """Get weight history for user"""
+        try:
+            # Check if user exists
+            user_query = "SELECT UserID FROM userdetails WHERE UserID = %s"
+            user_exists = DatabaseHelper.execute_query(user_query, (user_id,), fetch_one=True)
+            
+            if not user_exists:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get weight history
+            query = """
+                SELECT WeightID, Weight, DateTime, Notes
+                FROM userweight
+                WHERE UserID = %s
+                ORDER BY DateTime DESC
+            """
+            weight_history = DatabaseHelper.execute_query(query, (user_id,))
+            
+            # Format response
+            formatted_history = []
+            for entry in weight_history:
+                formatted_history.append({
+                    'WeightID': entry['WeightID'],
+                    'Weight': float(entry['Weight']),
+                    'DateTime': str(entry['DateTime']),
+                    'Notes': entry.get('Notes')
+                })
+            
+            return Response({
+                'success': True,
+                'data': formatted_history
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching weight history: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def post(self, request, user_id):
+        """Add new weight entry"""
+        try:
+            # Check if user exists
+            user_query = "SELECT UserID FROM userdetails WHERE UserID = %s"
+            user_exists = DatabaseHelper.execute_query(user_query, (user_id,), fetch_one=True)
+            
+            if not user_exists:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Validate weight
+            weight = request.data.get('Weight')
+            if not weight:
+                return Response({
+                    'success': False,
+                    'message': 'Weight is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Insert weight entry
+            insert_query = """
+                INSERT INTO userweight (UserID, DateTime, Weight, Notes)
+                VALUES (%s, NOW(), %s, %s)
+            """
+            notes = request.data.get('Notes', '')
+            weight_id = DatabaseHelper.execute_insert(insert_query, (user_id, weight, notes))
+            
+            if weight_id:
+                # Fetch created entry
+                fetch_query = """
+                    SELECT WeightID, Weight, DateTime, Notes
+                    FROM userweight
+                    WHERE WeightID = %s
+                """
+                created_entry = DatabaseHelper.execute_query(fetch_query, (weight_id,), fetch_one=True)
+                
+                return Response({
+                    'success': True,
+                    'message': 'Weight entry added',
+                    'data': {
+                        'WeightID': created_entry['WeightID'],
+                        'Weight': float(created_entry['Weight']),
+                        'DateTime': str(created_entry['DateTime']),
+                        'Notes': created_entry.get('Notes')
+                    }
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to add weight entry'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        except Exception as e:
+            logger.error(f"Error adding weight entry: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def delete(self, request, user_id):
+        """Delete a weight entry"""
+        try:
+            weight_id = request.data.get('WeightID')
+            if not weight_id:
+                return Response({
+                    'success': False,
+                    'message': 'WeightID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Verify the weight entry belongs to this user
+            check_query = "SELECT UserID FROM userweight WHERE WeightID = %s"
+            weight_entry = DatabaseHelper.execute_query(check_query, (weight_id,), fetch_one=True)
+            
+            if not weight_entry:
+                return Response({
+                    'success': False,
+                    'message': 'Weight entry not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            if weight_entry['UserID'] != user_id:
+                return Response({
+                    'success': False,
+                    'message': 'Unauthorized'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Delete the entry
+            delete_query = "DELETE FROM userweight WHERE WeightID = %s"
+            row_count = DatabaseHelper.execute_update(delete_query, (weight_id,))
+            
+            if row_count > 0:
+                return Response({
+                    'success': True,
+                    'message': 'Weight entry deleted'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to delete weight entry'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        except Exception as e:
+            logger.error(f"Error deleting weight entry: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserProfileView(APIView):
+    """Get combined user and physical information"""
+    
+    def get(self, request, user_id):
+        """Get user profile with physical info and calculated BMI"""
+        try:
+            # Get user details
+            user_query = """
+                SELECT UserID, Username, Email, Name, ProfilePicture
+                FROM userdetails
+                WHERE UserID = %s
+            """
+            user_data = DatabaseHelper.execute_query(user_query, (user_id,), fetch_one=True)
+            
+            if not user_data:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get physical info
+            physical_query = """
+                SELECT PhysicalInfoID, UserID, DOB, Gender, Height, 
+                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle,
+                       CurrentWeight
+                FROM physicalinfo
+                WHERE UserID = %s
+            """
+            physical_data = DatabaseHelper.execute_query(physical_query, (user_id,), fetch_one=True)
+            
+            if not physical_data:
+                return Response({
+                    'success': False,
+                    'message': 'Physical information not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Calculate BMI
+            height = float(physical_data.get('Height', 0))
+            current_weight = float(physical_data.get('CurrentWeight', 0))
+            
+            bmi = None
+            if height > 0 and current_weight > 0:
+                height_m = height / 100
+                bmi = round(current_weight / (height_m * height_m), 1)
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'user': {
+                        'UserID': user_data['UserID'],
+                        'Name': user_data['Name'],
+                        'Username': user_data['Username'],
+                        'Email': user_data['Email']
+                    },
+                    'physicalInfo': {
+                        'PhysicalInfoID': physical_data['PhysicalInfoID'],
+                        'DOB': str(physical_data['DOB']),
+                        'Gender': physical_data['Gender'],
+                        'Height': float(physical_data['Height']),
+                        'CurrentWeight': float(physical_data['CurrentWeight']) if physical_data.get('CurrentWeight') else None,
+                        'TargetWeight': float(physical_data['TargetWeight']),
+                        'ActivityLevel': physical_data['ActivityLevel'],
+                        'Goal': physical_data['Goal'],
+                        'BodyFat': float(physical_data['BodyFat']) if physical_data.get('BodyFat') else None,
+                        'Lifestyle': physical_data.get('Lifestyle'),
+                        'BMI': bmi
+                    }
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching user profile: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
