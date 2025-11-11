@@ -1,18 +1,20 @@
 import React from 'react';
-import { ProfileCard } from '../cards/ProfileCard';
-import { TDEECard } from '../cards/TDEECard';
+import { MergedProfileCard } from '../cards/MergedProfileCard';
 import { MacroBarsCard } from '../cards/MacroBarsCard';
 import { gridContainerStyle } from '../styles/glassCard';
 
-export function TopGrid({ user, tdeeData, macroData }) {
+export function TopGrid({ user, tdeeData, macroData, bmi = 24.5 }) {
   return (
     <div style={{
       ...gridContainerStyle,
-      gridTemplateColumns: '280px 280px 1fr',
+      gridTemplateColumns: '560px 1fr',
       display: 'grid'
     }}>
-      <ProfileCard user={user} />
-      <TDEECard tdeeData={tdeeData} />
+      <MergedProfileCard 
+        user={user} 
+        tdeeData={tdeeData}
+        bmi={bmi}
+      />
       <MacroBarsCard macroData={macroData} />
     </div>
   );
