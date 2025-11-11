@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { foodService } from '../../services/foodService';
 import { calculateNutritionTotals } from '../../utils/helpers';
 import { Button } from '../Common/Button';
+import { DatePicker } from '../Dashboard/cards/DatePicker';
 import Sidebar from '../Navigation/Sidebar';
 
 const MealEntryApp = ({ user, onNavigate = () => {} }) => {
@@ -13,8 +14,18 @@ const MealEntryApp = ({ user, onNavigate = () => {} }) => {
   const [presets, setPresets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [mealType, setMealType] = useState('Breakfast');
-  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
-  const [logTime, setLogTime] = useState('08:00');
+  
+  // Default to current date and time
+  const [logDate, setLogDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  
+  const [logTime, setLogTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
+  
   const [loading, setLoading] = useState(false);
   const [foodDataCache, setFoodDataCache] = useState({});
   const [nutritionTheme, setNutritionTheme] = useState('modern');
@@ -85,6 +96,9 @@ const MealEntryApp = ({ user, onNavigate = () => {} }) => {
       if (response.success) {
         alert('Logged successfully!');
         setSelectedFoods([]);
+        // Reset time to current time after logging
+        const now = new Date();
+        setLogTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
       }
     } catch (error) {
       alert('Error: ' + error.message);
@@ -343,19 +357,22 @@ const MealEntryApp = ({ user, onNavigate = () => {} }) => {
               <option>Snack</option>
             </select>
 
+            {/* Cool Date Picker and Time Side by Side - Equal Size */}
             <div style={{ display: 'flex', gap: '12px', marginBottom: '14.4px' }}>
-              <input
-                type="time"
-                value={logTime}
-                onChange={(e) => setLogTime(e.target.value)}
-                style={{ flex: 1, padding: '12px', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', color: '#fff', boxSizing: 'border-box', fontSize: '14.4px' }}
-              />
-              <input
-                type="date"
-                value={logDate}
-                onChange={(e) => setLogDate(e.target.value)}
-                style={{ flex: 1, padding: '12px', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', color: '#fff', boxSizing: 'border-box', fontSize: '14.4px' }}
-              />
+              <div style={{ flex: 1 }}>
+                <DatePicker 
+                  selectedDate={logDate}
+                  onDateChange={setLogDate}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  type="time"
+                  value={logTime}
+                  onChange={(e) => setLogTime(e.target.value)}
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', color: '#fff', boxSizing: 'border-box', fontSize: '14px' }}
+                />
+              </div>
             </div>
 
             <div style={{ fontSize: '15.6px', fontWeight: 'bold', marginBottom: '9.6px' }}>Items Quantity (g)</div>

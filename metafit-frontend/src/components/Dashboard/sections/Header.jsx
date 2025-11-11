@@ -1,6 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { DatePicker } from '../cards/DatePicker';
 
-export function Header({ user, days, selectedDay, onDayChange }) {
+export function Header({ user, days, selectedDay, onDayChange, onDateChange }) {
+  // Convert day name to YYYY-MM-DD format
+  const getDayDate = (dayName) => {
+    const today = new Date();
+    
+    const dayOffset = {
+      'Monday': -today.getDay() + 1,
+      'Tuesday': -today.getDay() + 2,
+      'Wednesday': -today.getDay() + 3,
+      'Thursday': -today.getDay() + 4,
+      'Friday': -today.getDay() + 5,
+      'Saturday': -today.getDay() + 6,
+      'Sunday': -today.getDay() + 0
+    };
+
+    const date = new Date(today);
+    date.setDate(date.getDate() + (dayOffset[dayName] || 0));
+    
+    return date.toISOString().split('T')[0];
+  };
+
+  const selectedDate = getDayDate(selectedDay);
+
   return (
     <div style={{ marginBottom: '25px' }}>
       <div style={{
@@ -27,15 +50,23 @@ export function Header({ user, days, selectedDay, onDayChange }) {
             color: '#fff',
             margin: 0
           }}>
-            Ready to track your fitness with swag?
+            Ready to track your fitness with swag? • {selectedDate}
           </p>
         </div>
 
         <div style={{
           display: 'flex',
           gap: '10px',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          alignItems: 'center'
         }}>
+          {/* Date Picker */}
+          <DatePicker 
+            selectedDate={selectedDate} 
+            onDateChange={onDateChange}
+          />
+
+          {/* Day Selector Buttons */}
           {days.map(day => (
             <button
               key={day}
