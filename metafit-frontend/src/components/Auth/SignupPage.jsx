@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 const SignupWizard = ({ onSignupComplete }) => {
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Step 1: Name
   const [name, setName] = useState('');
@@ -176,7 +178,17 @@ const SignupWizard = ({ onSignupComplete }) => {
 
       const data = await response.json();
       if (data.success) {
-        onSignupComplete?.(data.data);
+        // Show success message
+        setSuccessMessage(`Welcome ${data.data.Name}! Your account has been created successfully.`);
+        setShowSuccessMessage(true);
+        
+        // Redirect to login after 2.5 seconds
+        setTimeout(() => {
+          // Call the callback to redirect to login page
+          if (onSignupComplete) {
+            onSignupComplete(data.data);
+          }
+        }, 2500);
       } else {
         setError(data.message || 'Signup failed');
       }
@@ -320,8 +332,95 @@ const SignupWizard = ({ onSignupComplete }) => {
     transition: 'background-color 0.3s'
   });
 
+  // Success message modal style
+  const successModalStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
+  };
+
+  const successCardStyle = {
+    background: 'rgba(30, 41, 59, 0.98)',
+    border: '2px solid #4ade80',
+    borderRadius: '16px',
+    padding: '40px',
+    textAlign: 'center',
+    maxWidth: '400px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.7)'
+  };
+
+  const successIconStyle = {
+    fontSize: '64px',
+    marginBottom: '16px',
+    animation: 'scaleIn 0.5s ease-out'
+  };
+
+  const successTitleStyle = {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#4ade80',
+    marginBottom: '12px'
+  };
+
+  const successTextStyle = {
+    fontSize: '14px',
+    color: '#e2e8f0',
+    marginBottom: '20px',
+    lineHeight: '1.6'
+  };
+
+  const loadingTextStyle = {
+    fontSize: '12px',
+    color: '#a1a1aa',
+    marginTop: '12px'
+  };
+
+  // Success Modal Component
+  const SuccessModal = () => (
+    <div style={successModalStyle}>
+      <style>{`
+        @keyframes scaleIn {
+          from {
+            transform: scale(0);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        .pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
+      <div style={successCardStyle}>
+        <div style={successIconStyle}>✓</div>
+        <div style={successTitleStyle}>Registration Successful!</div>
+        <div style={successTextStyle}>{successMessage}</div>
+        <div style={loadingTextStyle} className="pulse">Redirecting to login...</div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={containerStyle}>
+      {showSuccessMessage && <SuccessModal />}
+      
       <div style={cardStyle}>
         {/* Step 1: Name */}
         {step === 1 && (

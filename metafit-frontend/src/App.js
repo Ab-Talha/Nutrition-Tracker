@@ -3,7 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { LoadingSpinner } from './components/Common/LoadingSpinner';
 import { LoginPage } from './components/Auth/LoginPage';
-import { RegisterPage } from './components/Auth/RegisterPage';
+import SignupWizard from './components/Auth/SignupPage'; // Import as SignupWizard
 import MealEntryApp from './components/MealEntry/MealEntryApp';
 import Dashboard from './components/Dashboard/Dashboard';
 
@@ -27,9 +27,14 @@ const AppContent = () => {
         padding: '20px'
       }}>
         {authMode === 'login' ? (
-          <LoginPage onSwitchToRegister={() => setAuthMode('register')} />
+          <LoginPage onSwitchToRegister={() => setAuthMode('signup')} />
         ) : (
-          <RegisterPage onSwitchToLogin={() => setAuthMode('login')} />
+          <SignupWizard 
+            onSignupComplete={() => {
+              // After successful signup, redirect to login
+              setAuthMode('login');
+            }}
+          />
         )}
       </div>
     );

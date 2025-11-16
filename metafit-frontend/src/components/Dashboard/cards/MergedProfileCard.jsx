@@ -1,14 +1,88 @@
-import React, { useState } from 'react';
-import { glassCardStyle } from '../styles/glassCard';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../../../services/api';
 
-export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, height = 150 }) {
+// Mock service for demo - replace with actual import
+// import { dashboardService } from '../services/dashboardService';
+const dashboardService = {
+  getDashboardData: async (userId) => {
+    // Mock data for demo
+    return {
+      profile: { Name: 'John Doe', Username: 'johndoe', BMI: 24.5 },
+      physical: { 
+        CurrentWeight: 70, 
+        Height: 175, 
+        DOB: '1990-01-01', 
+        Gender: 'Male',
+        ActivityLevel: 'Moderately Active',
+        Goal: 'Weight Loss',
+        TargetWeight: 68
+      },
+      tdee: { tdee: 2500 }
+    };
+  },
+  getTDEEBreakdown: (tdee) => [
+    { percent: '40%', label: 'Maintenance', value: tdee },
+    { percent: '35%', label: 'Mild Deficit', value: Math.round(tdee * 0.85) },
+    { percent: '30%', label: 'Moderate Deficit', value: Math.round(tdee * 0.75) }
+  ]
+};
+
+const glassCardStyle = {
+  background: 'rgba(255, 255, 255, 0.1)',
+  backdropFilter: 'blur(10px)',
+  borderRadius: '12px',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  padding: '20px',
+  color: '#fff'
+};
+
+export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, height = 150, userId = 1, refreshInterval = 30000 }) {
   const [hoveredStat, setHoveredStat] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [physicalInfo, setPhysicalInfo] = useState(null);
+  const [calculatedTdee, setCalculatedTdee] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch data
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const data = await dashboardService.getDashboardData(userId);
+      setProfileData(data.profile);
+      setPhysicalInfo(data.physical);
+      setCalculatedTdee(data.tdee);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }, [userId]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Auto-refresh
+  useEffect(() => {
+    const interval = setInterval(fetchData, refreshInterval);
+    return () => clearInterval(interval);
+  }, [fetchData, refreshInterval]);
+
+  // Use API data if available, otherwise use props
+  const displayUser = profileData || user;
+  const displayWeight = physicalInfo?.CurrentWeight ?? weight;
+  const displayHeight = physicalInfo?.Height ?? height;
+  const displayBmi = profileData?.BMI ?? bmi;
+  const displayGoal = physicalInfo?.Goal ?? 'Weight Loss';
+  const displayTdeeData = calculatedTdee ? dashboardService.getTDEEBreakdown(calculatedTdee.tdee) : tdeeData;
 
   // Convert height to different units
-  const heightCm = height;
-  const heightM = (height / 100).toFixed(2);
-  const heightFt = (height / 30.48).toFixed(2);
-  const heightInches = ((height / 2.54) % 12).toFixed(1);
+  const heightCm = displayHeight;
+  const heightM = (displayHeight / 100).toFixed(2);
+  const heightFt = (displayHeight / 30.48).toFixed(2);
+  const heightInches = ((displayHeight / 2.54) % 12).toFixed(1);
 
   // BMI Category
   const getBMICategory = (bmi) => {
@@ -86,6 +160,36 @@ export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, hei
     );
   };
 
+  if (loading) {
+    return (
+      <div style={{
+        ...glassCardStyle,
+        minWidth: '560px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ textAlign: 'center', padding: '40px' }}>Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        ...glassCardStyle,
+        minWidth: '560px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#ff6b6b' }}>
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       ...glassCardStyle,
@@ -110,9 +214,9 @@ export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, hei
             }}></div>
             <div>
               <h2 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '2px', margin: 0 }}>
-                {user?.Name || 'User'}
+                {displayUser?.Name || 'User'}
               </h2>
-              <p style={{ fontSize: '10px', opacity: 0.6, margin: 0 }}>@{user?.Username || 'username'}</p>
+              <p style={{ fontSize: '10px', opacity: 0.6, margin: 0 }}>@{displayUser?.Username || 'username'}</p>
             </div>
           </div>
 
@@ -125,8 +229,8 @@ export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, hei
             <StatBox
               icon="⚖️"
               label="Weight"
-              value={`${weight}kg`}
-              details={`${(weight * 2.205).toFixed(1)} lbs`}
+              value={`${displayWeight}kg`}
+              details={`${(displayWeight * 2.205).toFixed(1)} lbs`}
               statKey="weight"
             />
             <StatBox
@@ -139,8 +243,8 @@ export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, hei
             <StatBox
               icon="📊"
               label="BMI"
-              value={bmi.toFixed(1)}
-              details={getBMICategory(bmi)}
+              value={displayBmi.toFixed(1)}
+              details={getBMICategory(displayBmi)}
               statKey="bmi"
             />
           </div>
@@ -162,7 +266,7 @@ export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, hei
             }}
           >
             <div style={{ fontSize: '10px', opacity: 0.7, marginBottom: '4px' }}>🎯 Target</div>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#85cc17' }}>Weight Loss</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#85cc17' }}>{displayGoal}</div>
 
             {hoveredStat === 'goal' && (
               <div
@@ -208,7 +312,7 @@ export function MergedProfileCard({ user, tdeeData, bmi = 24.5, weight = 70, hei
             ⚡ Daily Target
           </h3>
 
-          {tdeeData && tdeeData.map((item, idx) => {
+          {displayTdeeData && displayTdeeData.map((item, idx) => {
             const isHovered = hoveredStat === `tdee-${idx}`;
             return (
               <div
