@@ -5,8 +5,17 @@ export const authService = {
     try {
       const response = await api.post('/login/', { username, password });
       if (response.data.success) {
-        localStorage.setItem('user', JSON.stringify(response.data.data));
-        return response.data.data;
+        const userData = response.data.data;
+        
+        // ⭐ SAVE FULL USER DATA TO localStorage
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        // ⭐ ALSO SAVE userID SEPARATELY FOR PROFILE PAGE
+        localStorage.setItem('userID', userData.UserID);
+        
+        console.log('✅ Login successful. UserID saved:', userData.UserID);
+        
+        return userData;
       }
       throw new Error(response.data.message);
     } catch (error) {
@@ -32,11 +41,25 @@ export const authService = {
   },
 
   logout: () => {
+    // ⭐ CLEAR BOTH STORAGE ITEMS
     localStorage.removeItem('user');
+    localStorage.removeItem('userID');
+    
+    console.log('✅ Logged out. localStorage cleared');
   },
 
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+
+  // ⭐ NEW HELPER - Get userID only (for Profile page)
+  getUserID: () => {
+    return localStorage.getItem('userID');
+  },
+
+  // ⭐ NEW HELPER - Check if authenticated
+  isAuthenticated: () => {
+    return !!localStorage.getItem('userID');
   }
 };

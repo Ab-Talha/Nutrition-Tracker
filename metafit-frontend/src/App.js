@@ -3,14 +3,16 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { LoadingSpinner } from './components/Common/LoadingSpinner';
 import { LoginPage } from './components/Auth/LoginPage';
-import SignupWizard from './components/Auth/SignupPage'; // Import as SignupWizard
+import SignupWizard from './components/Auth/SignupPage';
 import MealEntryApp from './components/MealEntry/MealEntryApp';
 import Dashboard from './components/Dashboard/Dashboard';
+import Profile from './components/Profile/Profile';
+import Sidebar from './components/Navigation/Sidebar';
 
 const AppContent = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [authMode, setAuthMode] = useState('login');
-  const [currentPage, setCurrentPage] = useState('meal-entry'); // Start with meal-entry
+  const [currentPage, setCurrentPage] = useState('dashboard');
 
   if (loading) {
     return <LoadingSpinner />;
@@ -31,7 +33,6 @@ const AppContent = () => {
         ) : (
           <SignupWizard 
             onSignupComplete={() => {
-              // After successful signup, redirect to login
               setAuthMode('login');
             }}
           />
@@ -40,11 +41,68 @@ const AppContent = () => {
     );
   }
 
-  // Render based on current page
-  return currentPage === 'dashboard' ? (
-    <Dashboard user={user} onNavigate={setCurrentPage} />
-  ) : (
-    <MealEntryApp user={user} onNavigate={setCurrentPage} />
+  // Render logged-in app with Sidebar
+  const handleLogout = () => {
+    logout();
+    localStorage.clear();
+  };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'profile':
+        return <Profile />;
+      case 'dashboard':
+        return <Dashboard user={user} onNavigate={setCurrentPage} />;
+      case 'meal-entry':
+        return <MealEntryApp user={user} onNavigate={setCurrentPage} />;
+      case 'auto-meal':
+        return (
+          <div style={{
+            marginLeft: '100px',
+            padding: '40px',
+            color: '#fff',
+            minHeight: '100vh'
+          }}>
+            <h1>🤖 Auto Meal (Coming Soon)</h1>
+            <p style={{ fontSize: '16px', color: '#aaa' }}>
+              This feature will be available soon!
+            </p>
+          </div>
+        );
+      case 'workout':
+        return (
+          <div style={{
+            marginLeft: '100px',
+            padding: '40px',
+            color: '#fff',
+            minHeight: '100vh'
+          }}>
+            <h1>💪 Workout (Coming Soon)</h1>
+            <p style={{ fontSize: '16px', color: '#aaa' }}>
+              This feature will be available soon!
+            </p>
+          </div>
+        );
+      default:
+        return <Dashboard user={user} onNavigate={setCurrentPage} />;
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      background: 'linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%)',
+      minHeight: '100vh'
+    }}>
+      <Sidebar
+        activePage={currentPage}
+        onNavigate={setCurrentPage}
+        onLogout={handleLogout}
+      />
+      <div style={{ flex: 1 }}>
+        {renderPage()}
+      </div>
+    </div>
   );
 };
 

@@ -1060,6 +1060,8 @@ class WeightHistoryView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Add this to your users/views.py - FIXED UserProfileView
+
 class UserProfileView(APIView):
     """Get combined user and physical information"""
     
@@ -1072,37 +1074,65 @@ class UserProfileView(APIView):
                 FROM userdetails
                 WHERE UserID = %s
             """
-            user_data = DatabaseHelper.execute_query(user_query, (user_id,), fetch_one=True)
-            
-            if not user_data:
-                return Response({
-                    'success': False,
-                    'message': 'User not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+            with connection.cursor() as cursor:
+                cursor.execute(user_query, (user_id,))
+                user_result = cursor.fetchone()
+                
+                if not user_result:
+                    return Response({
+                        'success': False,
+                        'message': 'User not found'
+                    }, status=status.HTTP_404_NOT_FOUND)
+                
+                user_columns = [col[0] for col in cursor.description]
+                user_data = dict(zip(user_columns, user_result))
             
             # Get physical info
             physical_query = """
                 SELECT PhysicalInfoID, UserID, DOB, Gender, Height, 
-                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle,
-                       CurrentWeight
-                FROM physicalinfo
+                       ActivityLevel, Goal, TargetWeight, BodyFat, Lifestyle
+                FROM userphysicalinfo
                 WHERE UserID = %s
             """
-            physical_data = DatabaseHelper.execute_query(physical_query, (user_id,), fetch_one=True)
+            with connection.cursor() as cursor:
+                cursor.execute(physical_query, (user_id,))
+                physical_result = cursor.fetchone()
+                
+                if not physical_result:
+                    return Response({
+                        'success': False,
+                        'message': 'Physical information not found for this user'
+                    }, status=status.HTTP_404_NOT_FOUND)
+                
+                physical_columns = [col[0] for col in cursor.description]
+                physical_data = dict(zip(physical_columns, physical_result))
             
-            if not physical_data:
-                return Response({
-                    'success': False,
-                    'message': 'Physical information not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+            # Get latest weight
+            weight_query = """
+                SELECT Weight, DateTime
+                FROM userweight
+                WHERE UserID = %s
+                ORDER BY DateTime DESC
+                LIMIT 1
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(weight_query, (user_id,))
+                weight_result = cursor.fetchone()
+                
+                latest_weight = None
+                if weight_result:
+                    weight_columns = [col[0] for col in cursor.description]
+                    latest_weight = dict(zip(weight_columns, weight_result))
             
             # Calculate BMI
-            height = float(physical_data.get('Height', 0))
-            current_weight = float(physical_data.get('CurrentWeight', 0))
+            height = float(physical_data.get('Height', 0)) if physical_data.get('Height') else 0
+            current_weight = float(latest_weight['Weight']) if latest_weight and latest_weight.get('Weight') else 0
             
             bmi = None
             if height > 0 and current_weight > 0:
-                height_m = height / 100
+                # Convert feet to centimeters: feet * 30.48
+                height_cm = height * 30.48
+                height_m = height_cm / 100
                 bmi = round(current_weight / (height_m * height_m), 1)
             
             return Response({
@@ -1112,15 +1142,17 @@ class UserProfileView(APIView):
                         'UserID': user_data['UserID'],
                         'Name': user_data['Name'],
                         'Username': user_data['Username'],
-                        'Email': user_data['Email']
+                        'Email': user_data['Email'],
+                        'ProfilePicture': user_data.get('ProfilePicture')
                     },
                     'physicalInfo': {
                         'PhysicalInfoID': physical_data['PhysicalInfoID'],
-                        'DOB': str(physical_data['DOB']),
+                        'DOB': str(physical_data['DOB']) if physical_data.get('DOB') else None,
                         'Gender': physical_data['Gender'],
-                        'Height': float(physical_data['Height']),
-                        'CurrentWeight': float(physical_data['CurrentWeight']) if physical_data.get('CurrentWeight') else None,
-                        'TargetWeight': float(physical_data['TargetWeight']),
+                        'Height': float(physical_data['Height']) if physical_data.get('Height') else None,
+                        'CurrentWeight': float(latest_weight['Weight']) if latest_weight and latest_weight.get('Weight') else None,
+                        'WeightLastUpdated': str(latest_weight['DateTime']) if latest_weight and latest_weight.get('DateTime') else None,
+                        'TargetWeight': float(physical_data['TargetWeight']) if physical_data.get('TargetWeight') else None,
                         'ActivityLevel': physical_data['ActivityLevel'],
                         'Goal': physical_data['Goal'],
                         'BodyFat': float(physical_data['BodyFat']) if physical_data.get('BodyFat') else None,
