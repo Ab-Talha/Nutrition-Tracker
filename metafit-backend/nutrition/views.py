@@ -12,6 +12,8 @@ from .serializers import (
     BulkFoodLogSerializer, DailySummarySerializer, PresetMealSerializer,
     DateRangeSerializer, MealTypeFilterSerializer, PresetWithFoodsSerializer
 )
+from .services.meal_plan_generator import MealPlanGenerator
+from .serializers import MealPlanRequestSerializer, MealPlanResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -637,4 +639,97 @@ class PresetMealDetailView(APIView):
             return Response({
                 'success': False,
                 'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class MealPlanGeneratorView(APIView):
+    """
+    Generate an optimized 7-day meal plan based on user parameters.
+    
+    POST: Generate a new meal plan
+    """
+
+    def post(self, request):
+        """
+        Generate a meal plan.
+        
+        Request body:
+        {
+            "user_id": 1,
+            "calorie_target": 2500,
+            "gender": "male",
+            "custom_macros": {
+                "protein": 150,
+                "carbs": 300,
+                "fat": 83
+            }
+        }
+        """
+        try:
+            # Validate request
+            serializer = MealPlanRequestSerializer(data=request.data)
+            
+            if not serializer.is_valid():
+                return Response({
+                    'success': False,
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            user_id = validated_data['user_id']
+            calorie_target = validated_data['calorie_target']
+            gender = validated_data['gender']
+            custom_macros = validated_data.get('custom_macros', None)
+
+            # Fetch all foods from database
+            logger.info(f"Fetching foods from database...")
+            foods = FoodDatabase.get_all_foods('', 1000, 0)
+
+            if not foods:
+                return Response({
+                    'success': False,
+                    'error': 'No foods available in database'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            logger.info(f"Generating meal plan for user {user_id}...")
+            
+            # Generate meal plan
+            generator = MealPlanGenerator(
+                foods_list=foods,
+                calorie_target=calorie_target,
+                gender=gender,
+                custom_macros=custom_macros
+            )
+            
+            meal_plan_result = generator.generate()
+
+            # Validate response with serializer
+            response_serializer = MealPlanResponseSerializer(data=meal_plan_result)
+            
+            if response_serializer.is_valid():
+                logger.info(f"Meal plan generated successfully for user {user_id}")
+                return Response(
+                    response_serializer.data,
+                    status=status.HTTP_201_CREATED
+                )
+            else:
+                logger.error(f"Response validation error: {response_serializer.errors}")
+                return Response({
+                    'success': False,
+                    'error': 'Failed to serialize response',
+                    'details': response_serializer.errors
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except ValueError as e:
+            logger.warning(f"Validation error: {str(e)}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error generating meal plan: {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'error': 'Failed to generate meal plan',
+                'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

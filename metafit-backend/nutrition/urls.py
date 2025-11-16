@@ -3,7 +3,8 @@ from .views import (
     FoodListView, FoodDetailView, FoodSearchView,
     UserFoodLogListView, UserFoodLogDetailView, BulkFoodLogView,
     DailySummaryView, MealTypeLogsView,
-    PresetMealListView, PresetMealDetailView
+    PresetMealListView, PresetMealDetailView,
+    MealPlanGeneratorView  # ADD THIS
 )
 from django.http import JsonResponse
 
@@ -46,6 +47,8 @@ urlpatterns = [
     # Preset meal endpoints
     path('presets/', PresetMealListView.as_view(), name='preset-list'),
     path('presets/<int:preset_id>/', PresetMealDetailView.as_view(), name='preset-detail'),
+    # Meal Plan endpoints
+    path('meal-plans/generate/', MealPlanGeneratorView.as_view(), name='meal-plan-generate'),
 
 
 ]

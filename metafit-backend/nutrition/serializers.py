@@ -188,4 +188,122 @@ class MealTypeFilterSerializer(serializers.Serializer):
         choices=['Breakfast', 'Lunch', 'Dinner', 'Snack'],
         required=True
     )
+
+
+class MealPlanRequestSerializer(serializers.Serializer):
+    """
+    Serializer for meal plan generation request.
+    """
+    user_id = serializers.IntegerField(required=True)
+    calorie_target = serializers.IntegerField(required=True, min_value=1000, max_value=5000)
+    gender = serializers.ChoiceField(choices=['male', 'female'], required=True)
+    custom_macros = serializers.DictField(
+        child=serializers.FloatField(),
+        required=False,
+        allow_null=True
+    )
+
+    def validate_calorie_target(self, value):
+        if value < 1000 or value > 5000:
+            raise serializers.ValidationError("Calorie target must be between 1000 and 5000.")
+        return value
+
+    def validate_gender(self, value):
+        if value.lower() not in ['male', 'female']:
+            raise serializers.ValidationError("Gender must be 'male' or 'female'.")
+        return value.lower()
+
+
+class MealItemSerializer(serializers.Serializer):
+    """Serializer for individual meal items."""
+    food_id = serializers.IntegerField()
+    food_name = serializers.CharField()
+    brand = serializers.CharField()
+    quantity = serializers.FloatField()
+    unit = serializers.CharField()
+    calories = serializers.FloatField()
+    protein = serializers.FloatField()
+    carbs = serializers.FloatField()
+    fat = serializers.FloatField()
+    fiber = serializers.FloatField()
+    sugar = serializers.FloatField()
+
+
+class MealTypeSerializer(serializers.Serializer):
+    """Serializer for meals in a day (breakfast, lunch, etc)."""
+    breakfast = MealItemSerializer(many=True)
+    lunch = MealItemSerializer(many=True)
+    dinner = MealItemSerializer(many=True)
+    snack = MealItemSerializer(many=True)
+
+
+class DailyTotalsSerializer(serializers.Serializer):
+    """Serializer for daily nutrition totals."""
+    calories = serializers.FloatField()
+    protein = serializers.FloatField()
+    carbs = serializers.FloatField()
+    fat = serializers.FloatField()
+    fiber = serializers.FloatField()
+    sugar = serializers.FloatField()
+
+
+class VarianceSerializer(serializers.Serializer):
+    """Serializer for macro variance percentages."""
+    calories = serializers.FloatField()
+    protein = serializers.FloatField()
+    carbs = serializers.FloatField()
+    fat = serializers.FloatField()
+
+
+class ValidationResultSerializer(serializers.Serializer):
+    """Serializer for validation results."""
+    is_valid = serializers.BooleanField()
+    errors = serializers.ListField(child=serializers.CharField())
+    warnings = serializers.ListField(child=serializers.CharField())
+    totals = DailyTotalsSerializer()
+    variance = VarianceSerializer()
+
+
+class DayPlanSerializer(serializers.Serializer):
+    """Serializer for a single day's meal plan."""
+    day = serializers.IntegerField()
+    date = serializers.CharField()
+    meals = MealTypeSerializer()
+    daily_totals = DailyTotalsSerializer()
+    validation = ValidationResultSerializer()
+
+
+class TargetMacrosSerializer(serializers.Serializer):
+    """Serializer for target macros."""
+    calorie_target = serializers.IntegerField()
+    protein = serializers.FloatField()
+    carbs = serializers.FloatField()
+    fat = serializers.FloatField()
+    fiber_min = serializers.FloatField()
+    sugar_max = serializers.FloatField()
+    gender = serializers.CharField()
+    is_custom = serializers.BooleanField()
+
+
+class WeeklySummarySerializer(serializers.Serializer):
+    """Serializer for weekly summary."""
+    overall_valid = serializers.BooleanField()
+    days_valid = serializers.IntegerField()
+    days_invalid = serializers.IntegerField()
+    total_errors = serializers.IntegerField()
+    total_warnings = serializers.IntegerField()
+    weekly_totals = DailyTotalsSerializer()
+    weekly_averages = DailyTotalsSerializer()
+
+
+class MealPlanResponseSerializer(serializers.Serializer):
+    """Serializer for complete meal plan response."""
+    success = serializers.BooleanField()
+    meal_plan = DayPlanSerializer(many=True)
+    weekly_summary = WeeklySummarySerializer()
+    target_macros = TargetMacrosSerializer()
+    variety_stats = serializers.DictField(
+        child=serializers.IntegerField()
+    )
+    
     log_date = serializers.DateField(required=False)
