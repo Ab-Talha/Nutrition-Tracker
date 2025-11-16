@@ -7,6 +7,7 @@ import SignupWizard from './components/Auth/SignupPage';
 import MealEntryApp from './components/MealEntry/MealEntryApp';
 import Dashboard from './components/Dashboard/Dashboard';
 import Profile from './components/Profile/Profile';
+import AutoMeal from './components/AutoMeal/AutoMeal';
 import Sidebar from './components/Navigation/Sidebar';
 
 const AppContent = () => {
@@ -56,19 +57,7 @@ const AppContent = () => {
       case 'meal-entry':
         return <MealEntryApp user={user} onNavigate={setCurrentPage} />;
       case 'auto-meal':
-        return (
-          <div style={{
-            marginLeft: '100px',
-            padding: '40px',
-            color: '#fff',
-            minHeight: '100vh'
-          }}>
-            <h1>🤖 Auto Meal (Coming Soon)</h1>
-            <p style={{ fontSize: '16px', color: '#aaa' }}>
-              This feature will be available soon!
-            </p>
-          </div>
-        );
+        return <AutoMeal />;
       case 'workout':
         return (
           <div style={{

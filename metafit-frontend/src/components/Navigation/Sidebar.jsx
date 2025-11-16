@@ -4,7 +4,7 @@ function Sidebar({ activePage = 'dashboard', onNavigate = () => {}, onLogout = (
   const sidebarIcons = [
     { id: 'profile', emoji: '👤', title: 'Profile' },
     { id: 'dashboard', emoji: '📊', title: 'Dashboard' },
-    { id: 'auto-meal', emoji: '🤖', title: 'Auto Meal', disabled: true },
+    { id: 'auto-meal', emoji: '🤖', title: 'Auto Meal' },
     { id: 'meal-entry', emoji: '🍽️', title: 'Meal Entry' },
     { id: 'workout', emoji: '💪', title: 'Workout', disabled: true }
   ];

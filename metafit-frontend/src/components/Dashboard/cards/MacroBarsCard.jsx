@@ -446,11 +446,11 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
           >
             {/* Header */}
             <div style={{
-              padding: '12px 10px',
+              padding: '2px 10px',
               textAlign: 'center',
               fontSize: '12px',
               fontWeight: '700',
-              borderBottom: `2px solid ${macro.color}40`,
+              borderBottom: `1px solid ${macro.color}40`,
               background: `${macro.color}10`
             }}>
               <div style={{ fontSize: '16px', marginBottom: '4px' }}>{macro.icon}</div>
@@ -482,7 +482,7 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
 
             {/* Footer with Values */}
             <div style={{
-              padding: '10px 8px',
+              padding: '1px 8px',
               textAlign: 'center',
               background: 'rgba(0, 0, 0, 0.3)',
               borderTop: '1px solid rgba(255, 255, 255, 0.05)',
