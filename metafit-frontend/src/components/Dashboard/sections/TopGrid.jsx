@@ -3,7 +3,7 @@ import { MergedProfileCard } from '../cards/MergedProfileCard';
 import { MacroBarsCard } from '../cards/MacroBarsCard';
 import { gridContainerStyle } from '../styles/glassCard';
 
-export function TopGrid({ user, tdeeData, macroData, bmi = 24.5 }) {
+export function TopGrid({ user, tdeeData, macroData, bmi = 24.5, selectedDate }) {
   return (
     <div style={{
       ...gridContainerStyle,
@@ -15,7 +15,11 @@ export function TopGrid({ user, tdeeData, macroData, bmi = 24.5 }) {
         tdeeData={tdeeData}
         bmi={bmi}
       />
-      <MacroBarsCard macroData={macroData} />
+      {/* ✅ Pass selectedDate to MacroBarsCard */}
+      <MacroBarsCard 
+        macroData={macroData}
+        selectedDate={selectedDate}
+      />
     </div>
   );
 }

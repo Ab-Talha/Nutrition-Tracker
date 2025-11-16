@@ -3,7 +3,7 @@ import { WeightChartCard } from '../cards/WeightChartCard';
 import { NutritionSummaryCard } from '../cards/NutritionSummaryCard';
 import { gridContainerStyle } from '../styles/glassCard';
 
-export function BottomGrid({ weightData, nutritionSummary }) {
+export function BottomGrid({ weightData, nutritionSummary, selectedDate }) {
   return (
     <div style={{
       ...gridContainerStyle,
@@ -11,7 +11,8 @@ export function BottomGrid({ weightData, nutritionSummary }) {
       display: 'grid'
     }}>
       <WeightChartCard weightData={weightData} />
-      <NutritionSummaryCard nutritionSummary={nutritionSummary} />
+      {/* ✅ Pass selectedDate to NutritionSummaryCard */}
+      <NutritionSummaryCard selectedDate={selectedDate} />
     </div>
   );
 }

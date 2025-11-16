@@ -77,15 +77,19 @@ function Dashboard({ user, onNavigate = () => {} }) {
           onDateChange={handleDateChange}
         />
         
+        {/* ✅ PASS selectedDate to TopGrid */}
         <TopGrid 
           user={user} 
           tdeeData={tdeeData} 
           macroData={macroData}
+          selectedDate={selectedDate}
         />
         
+        {/* ✅ PASS selectedDate to BottomGrid */}
         <BottomGrid 
           weightData={weightData} 
           nutritionSummary={nutritionSummary}
+          selectedDate={selectedDate}
         />
         
         <MealsSection 

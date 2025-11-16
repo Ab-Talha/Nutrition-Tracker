@@ -140,66 +140,211 @@ class LoginView(APIView):
 
 
 class RegisterView(APIView):
-    """Handle user registration"""
+    """Handle user registration with complete profile data"""
     
     def post(self, request):
         try:
+            # ========== EXTRACT ALL FIELDS FROM REQUEST ==========
             username = request.data.get('username', '').strip()
             email = request.data.get('email', '').strip()
             password = request.data.get('password', '').strip()
             name = request.data.get('name', '').strip()
             
-            # Validate inputs
+            # Physical info fields
+            dob = request.data.get('dob', '').strip()
+            gender = request.data.get('gender', '').strip()
+            height = request.data.get('height')
+            weight = request.data.get('weight')
+            goal = request.data.get('goal', '').strip()
+            activity_level = request.data.get('activityLevel', '').strip()
+            
+            # ========== VALIDATE BASIC FIELDS ==========
             if not all([username, email, password, name]):
                 return Response({
                     'success': False,
-                    'message': 'All fields are required'
+                    'message': 'Basic fields required: username, email, password, name'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
+            # Validate password length
             if len(password) < 6:
                 return Response({
                     'success': False,
                     'message': 'Password must be at least 6 characters'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Check if user exists
+            # ========== VALIDATE PHYSICAL INFO FIELDS ==========
+            if not all([dob, gender, height, weight, goal, activity_level]):
+                return Response({
+                    'success': False,
+                    'message': 'Physical info required: dob, gender, height, weight, goal, activityLevel'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate height range (2-8 feet)
+            try:
+                height_float = float(height)
+                if height_float < 2 or height_float > 8:
+                    return Response({
+                        'success': False,
+                        'message': 'Height must be between 2 and 8 feet'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({
+                    'success': False,
+                    'message': 'Height must be a valid number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate weight range (30-300 kg)
+            try:
+                weight_float = float(weight)
+                if weight_float < 30 or weight_float > 300:
+                    return Response({
+                        'success': False,
+                        'message': 'Weight must be between 30 and 300 kg'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({
+                    'success': False,
+                    'message': 'Weight must be a valid number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate gender
+            valid_genders = ['Male', 'Female', 'Other']
+            if gender not in valid_genders:
+                return Response({
+                    'success': False,
+                    'message': f'Gender must be one of: {", ".join(valid_genders)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate goal
+            valid_goals = ['Weight Gain', 'Weight Loss', 'Maintain Weight', 'Muscle Gain']
+            if goal not in valid_goals:
+                return Response({
+                    'success': False,
+                    'message': f'Goal must be one of: {", ".join(valid_goals)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate activity level
+            valid_activity_levels = ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Extremely Active']
+            if activity_level not in valid_activity_levels:
+                return Response({
+                    'success': False,
+                    'message': f'Activity level must be one of: {", ".join(valid_activity_levels)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # ========== CHECK IF USER ALREADY EXISTS ==========
             check_query = """
                 SELECT UserID FROM userdetails 
-                WHERE Username = %s OR Email = %s
+                WHERE LOWER(Username) = LOWER(%s) OR LOWER(Email) = LOWER(%s)
             """
-            existing_user = DatabaseHelper.execute_query(check_query, (username, email), fetch_one=True)
+            with connection.cursor() as cursor:
+                cursor.execute(check_query, (username, email))
+                result = cursor.fetchone()
             
-            if existing_user:
+            if result:
                 return Response({
                     'success': False,
                     'message': 'Username or email already exists'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Hash password with SHA256
+            # ========== HASH PASSWORD ==========
             password_hash = hashlib.sha256(password.encode()).hexdigest()
             
-            # Create user
-            insert_query = """
-                INSERT INTO userdetails (Username, Email, Name, PasswordHash, CreatedAt, UpdatedAt)
-                VALUES (%s, %s, %s, %s, NOW(), NOW())
-            """
-            user_id = DatabaseHelper.execute_insert(insert_query, (username, email, name, password_hash))
-            
-            if user_id:
+            # ========== BEGIN TRANSACTION: INSERT USER DATA ==========
+            try:
+                with connection.cursor() as cursor:
+                    # Step 1: Insert into userdetails
+                    insert_user_query = """
+                        INSERT INTO userdetails 
+                        (Username, Email, Name, PasswordHash, CreatedAt, UpdatedAt)
+                        VALUES (%s, %s, %s, %s, NOW(), NOW())
+                    """
+                    cursor.execute(insert_user_query, (username, email, name, password_hash))
+                    user_id = cursor.lastrowid
+                    
+                    # Step 2: Insert into userphysicalinfo
+                    insert_physical_query = """
+                        INSERT INTO userphysicalinfo 
+                        (UserID, DOB, Gender, Height, ActivityLevel, Goal, TargetWeight)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    cursor.execute(insert_physical_query, (
+                        user_id,
+                        dob,
+                        gender,
+                        height_float,
+                        activity_level,
+                        goal,
+                        weight_float  # Initial weight as target for now
+                    ))
+                    physical_info_id = cursor.lastrowid
+                    
+                    # Step 3: Insert into userweight (track initial weight)
+                    insert_weight_query = """
+                        INSERT INTO userweight 
+                        (UserID, DateTime, Weight, Notes)
+                        VALUES (%s, NOW(), %s, %s)
+                    """
+                    cursor.execute(insert_weight_query, (
+                        user_id,
+                        weight_float,
+                        'Initial weight entry during signup'
+                    ))
+                    
+                    # Commit is automatic with connection.cursor() context manager
+                
+                # ========== FETCH COMPLETE DATA ==========
+                fetch_query = """
+                    SELECT 
+                        ud.UserID,
+                        ud.Username,
+                        ud.Email,
+                        ud.Name,
+                        upi.PhysicalInfoID,
+                        upi.DOB,
+                        upi.Gender,
+                        upi.Height,
+                        upi.ActivityLevel,
+                        upi.Goal,
+                        upi.TargetWeight
+                    FROM userdetails ud
+                    JOIN userphysicalinfo upi ON ud.UserID = upi.UserID
+                    WHERE ud.UserID = %s
+                """
+                
+                with connection.cursor() as cursor:
+                    cursor.execute(fetch_query, (user_id,))
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        columns = [col[0] for col in cursor.description]
+                        user_data = dict(zip(columns, result))
+                    else:
+                        user_data = None
+                
                 return Response({
                     'success': True,
                     'message': 'User registered successfully',
                     'data': {
-                        'UserID': user_id,
-                        'Username': username,
-                        'Email': email,
-                        'Name': name
+                        'UserID': user_data['UserID'],
+                        'Username': user_data['Username'],
+                        'Email': user_data['Email'],
+                        'Name': user_data['Name'],
+                        'DOB': str(user_data['DOB']),
+                        'Gender': user_data['Gender'],
+                        'Height': float(user_data['Height']),
+                        'ActivityLevel': user_data['ActivityLevel'],
+                        'Goal': user_data['Goal'],
+                        'CurrentWeight': float(weight_float),
+                        'PhysicalInfoID': user_data['PhysicalInfoID']
                     }
                 }, status=status.HTTP_201_CREATED)
-            else:
+                
+            except Exception as e:
+                logger.error(f"Transaction error during registration: {e}")
                 return Response({
                     'success': False,
-                    'message': 'Failed to create user'
+                    'message': 'Failed to create user account',
+                    'error': str(e)
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         except Exception as e:
@@ -208,7 +353,6 @@ class RegisterView(APIView):
                 'success': False,
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class UserDetailView(APIView):
     """Get user profile details"""
@@ -254,11 +398,11 @@ class CheckUsernameView(APIView):
                     'message': 'Username is required'
                 }, status=status.HTTP_200_OK)
             
-            if len(username) < 3:
+            if len(username) < 2:
                 return Response({
                     'success': False,
                     'available': False,
-                    'message': 'Username must be at least 3 characters'
+                    'message': 'Username must be at least 2 characters'
                 }, status=status.HTTP_200_OK)
             
             if len(username) > 50:

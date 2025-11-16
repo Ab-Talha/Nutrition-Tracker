@@ -1,3 +1,5 @@
+//E:\Nutrition Tracker (Django + React)\metafit-frontend\src\services\api.js
+
 import axios from 'axios';
 import { USERS_API } from '../utils/constants';
 
