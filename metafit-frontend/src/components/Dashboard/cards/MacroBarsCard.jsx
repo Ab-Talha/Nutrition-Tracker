@@ -107,20 +107,16 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get date to fetch (use selectedDate or today)
   const dateToFetch = useMemo(() => {
     if (selectedDate) {
-      // If date is provided, format it as YYYY-MM-DD
       if (selectedDate instanceof Date) {
         return selectedDate.toISOString().split('T')[0];
       }
-      return selectedDate; // Assume it's already formatted
+      return selectedDate;
     }
-    // Default to today
     return new Date().toISOString().split('T')[0];
   }, [selectedDate]);
 
-  // Fetch physical info from API
   const fetchPhysicalInfo = useCallback(async () => {
     if (!userId) return;
 
@@ -135,7 +131,6 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     }
   }, [userId]);
 
-  // Fetch daily nutrition summary from API
   const fetchDailySummary = useCallback(async () => {
     if (!userId) {
       setError('User ID not found');
@@ -146,15 +141,12 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     try {
       setError(null);
 
-      // Call the nutrition API directly (not the users API)
-      // Correct endpoint: api/nutrition/logs/summary/
       const nutritionApiUrl = process.env.REACT_APP_NUTRITION_API || 'http://localhost:8000/api/nutrition';
       const response = await axios.get(`${nutritionApiUrl}/logs/summary/?user_id=${userId}&date=${dateToFetch}`);
 
       if (response.data.success && response.data.data) {
         setDailySummary(response.data.data);
       } else {
-        // If no data for this date, set default zeros
         setDailySummary({
           TotalCalories: 0,
           TotalProtein: 0,
@@ -168,7 +160,6 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
       setLoading(false);
     } catch (err) {
       console.error('Error fetching daily summary:', err);
-      // Set default values if error
       setDailySummary({
         TotalCalories: 0,
         TotalProtein: 0,
@@ -181,13 +172,11 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     }
   }, [userId, dateToFetch]);
 
-  // Initial fetch
   useEffect(() => {
     fetchPhysicalInfo();
     fetchDailySummary();
   }, [fetchPhysicalInfo, fetchDailySummary]);
 
-  // Auto-refresh to get updated meal data
   useEffect(() => {
     const interval = setInterval(() => {
       fetchDailySummary();
@@ -196,25 +185,21 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     return () => clearInterval(interval);
   }, [fetchDailySummary, refreshInterval]);
 
-  // Calculate TDEE
   const tdee = useMemo(() => {
     if (!physicalInfo) return null;
     return calculateTDEE(physicalInfo);
   }, [physicalInfo]);
 
-  // Adjust TDEE based on goal
   const adjustedTdee = useMemo(() => {
     if (!tdee || !physicalInfo?.Goal) return tdee;
     return adjustTDEEForGoal(tdee, physicalInfo.Goal);
   }, [tdee, physicalInfo?.Goal]);
 
-  // Calculate macro targets
   const macroTargets = useMemo(() => {
     if (!adjustedTdee || !physicalInfo) return null;
     return calculateMacroTargets(adjustedTdee, physicalInfo.Gender);
   }, [adjustedTdee, physicalInfo]);
 
-  // Current intake from API
   const intakeData = useMemo(() => {
     if (!dailySummary) {
       return {
@@ -235,16 +220,14 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     };
   }, [dailySummary]);
 
-  // Macro color scheme
   const macroColors = {
-    protein: '#ff6b6b',
-    carbs: '#4ecdc4',
-    fat: '#ffd93d',
-    fiber: '#6bcf7f',
+    protein: '#ff6b5b',
+    carbs: '#00d9ff',
+    fat: '#ffdb58',
+    fiber: '#84cd63',
     sugar: '#ff8c42'
   };
 
-  // Get goal info
   const getGoalInfo = () => {
     const goal = physicalInfo?.Goal || '';
     const goalLower = goal.toLowerCase();
@@ -262,7 +245,6 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
 
   const goalInfo = getGoalInfo();
 
-  // Build macro data array
   const macroData = useMemo(() => {
     if (!macroTargets) return [];
 
@@ -310,16 +292,25 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     ];
   }, [macroTargets, intakeData]);
 
-  // Loading state
   if (loading) {
     return (
       <div style={glassCardStyle}>
-        <div style={{ textAlign: 'center', padding: '20px' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '2px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '2px solid #9d4edd',
+            borderRadius: '50%',
+            margin: '0 auto',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div style={glassCardStyle}>
@@ -330,7 +321,6 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     );
   }
 
-  // No data state
   if (!physicalInfo || !macroTargets || !tdee) {
     return (
       <div style={glassCardStyle}>
@@ -341,110 +331,167 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
     );
   }
 
+  const totalCalories = Math.round(
+    (intakeData.protein || 0) * 4 +
+    (intakeData.carbs || 0) * 4 +
+    (intakeData.fat || 0) * 9
+  );
+  const caloriePercent = (totalCalories / adjustedTdee) * 100;
+
   return (
     <div style={glassCardStyle}>
       {/* Header */}
       <div style={{ marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 8px 0', color: '#fff' }}>
-          📊 Daily Macro Targets
-        </h3>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '12px',
-          opacity: 0.8
+          marginBottom: '12px'
         }}>
-          <span>{physicalInfo.Gender === 'Male' ? '👨' : '👩'} {physicalInfo.Gender}</span>
-          <span>{goalInfo.icon} {goalInfo.label}</span>
+          <h3 style={{
+            fontSize: '16px',
+            fontWeight: '700',
+            margin: 0,
+            color: '#9d4edd'
+          }}>
+            📊 Daily Macro Targets
+          </h3>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '12px',
+            fontWeight: '600',
+            background: 'rgba(157, 78, 221, 0.15)',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            border: '1px solid rgba(157, 78, 221, 0.3)'
+          }}>
+            <span>{goalInfo.icon}</span>
+            <span>{goalInfo.label}</span>
+          </div>
         </div>
+
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '8px',
-          fontSize: '11px',
-          opacity: 0.7
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '10px',
+          fontSize: '12px'
         }}>
-          <span>Maintenance: {tdee} kcal</span>
-          <span style={{ color: goalInfo.surplus > 0 ? '#4ade80' : goalInfo.surplus < 0 ? '#ff6b6b' : '#85cc17' }}>
-            Target: {adjustedTdee} kcal
-            {goalInfo.surplus !== 0 && ` (${goalInfo.surplus > 0 ? '+' : ''} ${goalInfo.surplus})`}
-          </span>
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.2)',
+            padding: '10px 12px',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.05)'
+          }}>
+            <div style={{ opacity: 0.7, marginBottom: '4px', fontSize: '11px' }}>BMR</div>
+            <div style={{ fontWeight: '700', fontSize: '14px' }}>{tdee}</div>
+          </div>
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.2)',
+            padding: '10px 12px',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.05)'
+          }}>
+            <div style={{ opacity: 0.7, marginBottom: '4px', fontSize: '11px' }}>Target</div>
+            <div style={{ fontWeight: '700', fontSize: '14px', color: '#9d4edd' }}>{adjustedTdee}</div>
+          </div>
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.2)',
+            padding: '10px 12px',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.05)'
+          }}>
+            <div style={{ opacity: 0.7, marginBottom: '4px', fontSize: '11px' }}>Consumed</div>
+            <div style={{ fontWeight: '700', fontSize: '14px', color: totalCalories > adjustedTdee ? '#ff6b6b' : '#84cd63' }}>
+              {totalCalories}
+            </div>
+          </div>
         </div>
       </div>
+
+
 
       {/* Macro Bars Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(5, 1fr)',
-        gap: '12px'
+        gap: '10px',
+        marginBottom: '14px',
+        maxWidth: '100%'
       }}>
         {macroData.map((macro, idx) => (
           <div
             key={idx}
             style={{
               display: 'flex',
-              flexDirection: 'column-reverse',
-              height: '220px',
-              background: 'rgba(0, 0, 0, 0.3)',
-              borderRadius: '12px',
+              flexDirection: 'column',
+              height: '200px',
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '10px',
               overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
               position: 'relative',
-              minHeight: '220px'
+              transition: 'all 0.3s ease',
+              minWidth: '0'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)';
+              e.currentTarget.style.border = `1px solid ${macro.color}40`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+              e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
             }}
           >
-            {/* Macro Name */}
+            {/* Header */}
             <div style={{
-              position: 'absolute',
-              top: '8px',
-              left: 0,
-              right: 0,
+              padding: '12px 10px',
               textAlign: 'center',
               fontSize: '12px',
               fontWeight: '700',
-              zIndex: 2,
-              color: '#fff'
+              borderBottom: `2px solid ${macro.color}40`,
+              background: `${macro.color}10`
             }}>
-              {macro.icon} {macro.name}
+              <div style={{ fontSize: '16px', marginBottom: '4px' }}>{macro.icon}</div>
+              <div style={{ fontSize: '11px', opacity: 0.9 }}>{macro.name}</div>
             </div>
 
-            {/* Progress Bar (fills from bottom) */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                padding: '8px',
-                height: `${macro.percent}%`,
-                background: macro.color,
-                transition: 'height 0.5s ease',
-                opacity: 0.85,
-                minHeight: macro.percent > 0 ? '20px' : '0px',
-                width: '100%'
-              }}
-            >
-            </div>
-
-            {/* Always show target at bottom */}
+            {/* Bar Container */}
             <div style={{
-              fontSize: '11px',
-              fontWeight: '600',
-              textAlign: 'center',
-              padding: '10px 6px',
-              color: '#85cc17',
-              background: 'rgba(0, 0, 0, 0.3)',
-              width: '100%',
-              lineHeight: '1.5',
+              flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              gap: '2px'
+              background: 'rgba(0, 0, 0, 0.3)',
+              justifyContent: 'flex-end',
+              padding: '8px',
+              gap: '0'
             }}>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>
+              <div
+                style={{
+                  background: macro.color,
+                  width: '100%',
+                  height: `${macro.percent}%`,
+                  borderRadius: '6px',
+                  transition: 'height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  boxShadow: `0 0 12px ${macro.color}60`,
+                  minHeight: macro.percent > 0 ? '4px' : '0'
+                }}
+              ></div>
+            </div>
+
+            {/* Footer with Values */}
+            <div style={{
+              padding: '10px 8px',
+              textAlign: 'center',
+              background: 'rgba(0, 0, 0, 0.3)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+              fontSize: '11px'
+            }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#fff' }}>
                 {Math.round(macro.current)}
               </div>
-              <div style={{ fontSize: '9px', opacity: 0.9 }}>
+              <div style={{ opacity: 0.7, fontSize: '10px', marginTop: '3px' }}>
                 / {macro.target}g
               </div>
             </div>
@@ -452,22 +499,22 @@ export function MacroBarsCard({ refreshInterval = 30000, selectedDate = null }) 
         ))}
       </div>
 
-      {/* Summary Info */}
+      {/* Summary */}
       <div style={{
-        marginTop: '16px',
-        padding: '12px',
-        background: 'rgba(132, 204, 22, 0.1)',
+        background: 'linear-gradient(135deg, rgba(157, 78, 221, 0.1), rgba(157, 78, 221, 0.05))',
+        border: '1px solid rgba(157, 78, 221, 0.2)',
         borderRadius: '8px',
-        fontSize: '12px',
-        color: '#85cc17',
+        padding: '12px',
         textAlign: 'center',
-        fontWeight: '600'
+        fontSize: '11px',
+        fontWeight: '700'
       }}>
-        Total: {Math.round(
-          (intakeData.protein || 0) * 4 +
-          (intakeData.carbs || 0) * 4 +
-          (intakeData.fat || 0) * 9
-        )} / {adjustedTdee} kcal
+        <span style={{ color: '#b8a7d9' }}>TOTAL INTAKE: </span>
+        <span style={{
+          color: totalCalories > adjustedTdee ? '#ff6b6b' : '#84cd63'
+        }}>
+          {totalCalories} / {adjustedTdee} kcal
+        </span>
       </div>
     </div>
   );

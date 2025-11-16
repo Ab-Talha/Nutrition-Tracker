@@ -176,7 +176,18 @@ export function NutritionSummaryCard({ selectedDate = null }) {
   if (loading) {
     return (
       <div style={glassCardStyle}>
-        <div style={{ textAlign: 'center', padding: '20px' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '2px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '2px solid #9d4edd',
+            borderRadius: '50%',
+            margin: '0 auto',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
       </div>
     );
   }
@@ -207,30 +218,46 @@ export function NutritionSummaryCard({ selectedDate = null }) {
 
   return (
     <div style={glassCardStyle}>
+      {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '12px'
+        marginBottom: '16px'
       }}>
-        <h3 style={{
-          fontSize: '14px',
-          fontWeight: '700',
-          margin: 0
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
         }}>
-          🍽️ Nutrition Summary
-        </h3>
+          <span style={{ fontSize: '20px' }}>🍽️</span>
+          <h3 style={{
+            fontSize: '15px',
+            fontWeight: '700',
+            margin: 0,
+            color: '#9d4edd'
+          }}>
+            Nutrition Summary
+          </h3>
+        </div>
         <button
           onClick={() => setExpandMacros(!expandMacros)}
           style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: 'none',
-            color: '#fff',
-            padding: '4px 8px',
+            background: 'rgba(157, 78, 221, 0.15)',
+            border: '1px solid rgba(157, 78, 221, 0.3)',
+            color: '#9d4edd',
+            padding: '5px 10px',
             borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '12px',
-            transition: 'all 0.3s'
+            fontSize: '11px',
+            fontWeight: '700',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = 'rgba(157, 78, 221, 0.25)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = 'rgba(157, 78, 221, 0.15)';
           }}
         >
           {expandMacros ? 'Less' : 'More'}
@@ -240,14 +267,14 @@ export function NutritionSummaryCard({ selectedDate = null }) {
       {/* Alert Box */}
       {isOverLimit && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(251, 113, 133, 0.2))',
-          border: '1px solid rgba(239, 68, 68, 0.5)',
-          borderRadius: '8px',
-          padding: '8px',
+          background: 'rgba(255, 107, 107, 0.1)',
+          border: '1px solid rgba(255, 107, 107, 0.3)',
+          borderRadius: '6px',
+          padding: '10px 12px',
           marginBottom: '12px',
           fontSize: '11px',
-          fontWeight: '600',
-          color: '#fca5a5'
+          fontWeight: '700',
+          color: '#ff6b6b'
         }}>
           ⚠️ Exceeded by {Math.abs(remaining).toFixed(0)} calories
         </div>
@@ -255,14 +282,46 @@ export function NutritionSummaryCard({ selectedDate = null }) {
 
       {/* Calorie Bar */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(251, 113, 133, 0.15))',
-        border: '1px solid rgba(239, 68, 68, 0.3)',
-        borderRadius: '10px',
+        background: 'rgba(20, 20, 30, 0.5)',
+        border: '1px solid rgba(157, 78, 221, 0.2)',
+        borderRadius: '8px',
         padding: '12px',
         marginBottom: '12px'
       }}>
         <div style={{
-          height: '70px',
+          fontSize: '10px',
+          fontWeight: '700',
+          opacity: 0.6,
+          marginBottom: '8px',
+          color: '#b8a7d9',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          Daily Calories
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '8px'
+        }}>
+          <div style={{
+            fontSize: '18px',
+            fontWeight: '800',
+            color: '#fff'
+          }}>
+            {nutritionSummary.totalCalories}
+          </div>
+          <div style={{
+            fontSize: '11px',
+            fontWeight: '700',
+            color: remaining > 0 ? '#84cd63' : '#ff6b6b'
+          }}>
+            {remaining > 0 ? `${remaining.toFixed(0)} cal remaining` : `${Math.abs(remaining).toFixed(0)} cal over`}
+          </div>
+        </div>
+        <div style={{
+          height: '65px',
           background: 'rgba(0, 0, 0, 0.3)',
           borderRadius: '6px',
           overflow: 'hidden',
@@ -272,26 +331,11 @@ export function NutritionSummaryCard({ selectedDate = null }) {
         }}>
           <div
             style={{
-              background: 'linear-gradient(to top, rgba(251, 113, 133, 0.9), rgba(251, 113, 133, 0.6))',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '8px',
+              background: 'linear-gradient(to top, #dd1c1a, #9d4edd)',
               height: `${Math.min(percentage, 100)}%`,
               transition: 'height 0.5s ease'
             }}
-          >
-            <div style={{ fontSize: '14px', fontWeight: '700' }}>
-              {nutritionSummary.totalCalories}
-            </div>
-            <div style={{ fontSize: '11px', opacity: 0.9 }}>
-              of {nutritionSummary.targetCalories}
-            </div>
-          </div>
-        </div>
-        <div style={{ fontSize: '10px', opacity: 0.7, marginTop: '6px', textAlign: 'center' }}>
-          {remaining > 0 ? `${remaining.toFixed(0)} cal remaining` : `${Math.abs(remaining).toFixed(0)} cal over`}
+          ></div>
         </div>
       </div>
 
@@ -299,38 +343,49 @@ export function NutritionSummaryCard({ selectedDate = null }) {
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px'
+        gap: '10px'
       }}>
+        <div style={{
+          fontSize: '10px',
+          fontWeight: '700',
+          opacity: 0.6,
+          color: '#b8a7d9',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          Macronutrients
+        </div>
         {nutritionSummary.macros.map((item, idx) => {
           const macroPercents = [proteinPercent, carbsPercent, fatPercent];
           const macroPercent = Math.min(macroPercents[idx], 100);
+          const macroTargets = [proteinTarget, carbsTarget, fatTarget];
+          const colors = [
+            { bar: '#ff6b5b', label: 'Protein' },
+            { bar: '#00d9ff', label: 'Carbs' },
+            { bar: '#ffdb58', label: 'Fat' }
+          ];
 
           return (
             <div key={idx}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  marginBottom: '4px'
-                }}
-              >
-                <span>{item.label}</span>
-                <span>{item.value}g</span>
+              <div style={{ marginBottom: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700' }}>{item.label}</span>
               </div>
               <div style={{
                 height: '6px',
                 background: 'rgba(0, 0, 0, 0.3)',
                 borderRadius: '3px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                marginBottom: '4px'
               }}>
                 <div style={{
                   height: '100%',
-                  background: idx === 0 ? 'rgba(132, 204, 22, 0.8)' : idx === 1 ? 'rgba(34, 211, 238, 0.8)' : 'rgba(239, 68, 68, 0.8)',
+                  background: colors[idx].bar,
                   width: `${macroPercent}%`,
                   transition: 'width 0.5s ease'
                 }}></div>
+              </div>
+              <div style={{ fontSize: '10px', opacity: 0.7 }}>
+                {item.value}g / {macroTargets[idx]}g
               </div>
             </div>
           );
@@ -341,11 +396,19 @@ export function NutritionSummaryCard({ selectedDate = null }) {
         <div style={{
           marginTop: '12px',
           paddingTop: '12px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          borderTop: '1px solid rgba(157, 78, 221, 0.2)',
           fontSize: '11px',
-          opacity: 0.8
+          opacity: 0.85
         }}>
-          <p style={{ margin: '0 0 8px 0' }}>💡 Tips:</p>
+          <p style={{
+            margin: '0 0 8px 0',
+            fontWeight: '700',
+            color: '#9d4edd',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            💡 Tips
+          </p>
           <ul style={{ margin: 0, paddingLeft: '16px', lineHeight: '1.6' }}>
             <li>Maintain protein intake for muscle growth</li>
             <li>Balance carbs & fats for energy</li>
