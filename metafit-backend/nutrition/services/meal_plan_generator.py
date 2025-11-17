@@ -88,7 +88,7 @@ class MealPlanGenerator:
 
     def _generate_day(self, day_number, date):
         """
-        Generate meals for a single day.
+        Generate meals for a single day with post-generation adjustment.
 
         Args:
             day_number (int): Day 1-7
@@ -104,19 +104,59 @@ class MealPlanGenerator:
         }
 
         all_meals_items = []
+        meal_attempts = 0
+        max_attempts = 3
 
-        # Generate each meal type
-        for meal_type in self.MEAL_TYPES:
-            meal_calories_target = self.calorie_target * self.CALORIES_PER_MEAL[meal_type]
+        # Keep trying until we get within ±50 kcal tolerance
+        while meal_attempts < max_attempts:
+            all_meals_items = []
+
+            # Generate each meal type
+            for meal_type in self.MEAL_TYPES:
+                meal_calories_target = self.calorie_target * self.CALORIES_PER_MEAL[meal_type]
+                
+                meal_items = self._generate_meal(
+                    meal_type,
+                    meal_calories_target,
+                    day_number
+                )
+                
+                day_meals['meals'][meal_type] = meal_items
+                all_meals_items.extend(meal_items)
+
+            # Calculate total
+            total_calories = sum(item['calories'] for item in all_meals_items)
             
-            meal_items = self._generate_meal(
-                meal_type,
-                meal_calories_target,
-                day_number
-            )
+            # Check if within tolerance (±50 kcal)
+            tolerance = 50
+            if abs(total_calories - self.calorie_target) <= tolerance:
+                # GOOD! Within range
+                break
             
-            day_meals['meals'][meal_type] = meal_items
-            all_meals_items.extend(meal_items)
+            # Not within range - try to adjust
+            if meal_attempts < max_attempts - 1:
+                # If too high, reduce last item's quantity
+                if total_calories > self.calorie_target and all_meals_items:
+                    excess = total_calories - self.calorie_target
+                    last_item = all_meals_items[-1]
+                    
+                    # Reduce last item quantity by percentage
+                    reduction_factor = 1 - (excess / last_item['calories']) * 0.5
+                    reduction_factor = max(0.5, min(1.0, reduction_factor))
+                    
+                    last_item['quantity'] *= reduction_factor
+                    for key in ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']:
+                        last_item[key] *= reduction_factor
+                        last_item[key] = round(last_item[key], 2)
+                
+                # If too low, try regenerating with different foods
+                elif total_calories < self.calorie_target:
+                    # Clear and regenerate
+                    self.variety_manager.reset()
+                    for day in range(1, day_number + 1):
+                        self.variety_manager.start_day(day)
+            
+            meal_attempts += 1
 
         # Validate the day
         validation = ConstraintValidator.validate_daily_meal(
@@ -129,9 +169,9 @@ class MealPlanGenerator:
 
         return day_meals
 
-    def _generate_meal(self, meal_type, calories_target, day_number, max_items=3):
+    def _generate_meal(self, meal_type, calories_target, day_number, max_items=2):
         """
-        Generate a single meal (breakfast, lunch, etc).
+        Generate a single meal using 2 foods to match calorie target.
 
         Args:
             meal_type (str): 'breakfast', 'lunch', 'dinner', 'snack'
@@ -156,12 +196,19 @@ class MealPlanGenerator:
         used_today = self.variety_manager.get_day_foods(day_number)
         available_food_ids = [fid for fid in available_food_ids if fid not in used_today]
 
+        # Filter out ultra-dense foods for snacks (> 6 cal/gram)
+        if meal_type == 'snack':
+            available_food_ids = [
+                fid for fid in available_food_ids
+                if self._get_calorie_density(fid) < 6.0
+            ]
+
         if not available_food_ids:
             return meal_items
 
-        # Try to build meal with 1-3 items
-        while items_added < max_items and remaining_calories > 50 and available_food_ids:
-            # Score foods by how well they fit
+        # Add up to 2 foods to meal
+        while items_added < max_items and remaining_calories > 80 and available_food_ids:
+            # Score all available foods
             food_scores = []
             
             for food_id in available_food_ids:
@@ -169,38 +216,58 @@ class MealPlanGenerator:
                 if not food:
                     continue
 
-                score = self._score_food(
-                    food,
-                    remaining_calories,
-                    day_number
-                )
+                score = self._score_food(food, remaining_calories, day_number)
                 food_scores.append((food_id, food, score))
 
             if not food_scores:
                 break
 
-            # Sort by score (highest first) and select top food
+            # Sort by score and pick the best food
             food_scores.sort(key=lambda x: x[2], reverse=True)
             best_food_id, best_food, _ = food_scores[0]
 
-            # Calculate quantity to hit remaining calories
-            quantity = self._calculate_quantity(best_food, remaining_calories)
+            # STRICT: Don't exceed remaining calories
+            # If this is last item, use all remaining. Otherwise use 50%
+            if items_added == max_items - 1:
+                target_for_item = remaining_calories
+            else:
+                target_for_item = remaining_calories * 0.5
+
+            quantity = self._calculate_quantity(best_food, target_for_item)
 
             if quantity > 0:
                 meal_item = self._create_meal_item(best_food, quantity)
-                meal_items.append(meal_item)
                 
+                # CRITICAL: If this item exceeds remaining, skip it
+                if meal_item['calories'] > remaining_calories:
+                    available_food_ids.remove(best_food_id)
+                    continue
+                
+                meal_items.append(meal_item)
                 remaining_calories -= meal_item['calories']
                 items_added += 1
                 
                 # Register food usage
                 self.variety_manager.register_food(best_food_id, day_number)
                 available_food_ids.remove(best_food_id)
-
             else:
                 available_food_ids.remove(best_food_id)
 
         return meal_items
+
+    def _get_calorie_density(self, food_id):
+        """Get calorie density (cal/gram) for a food."""
+        food = next((f for f in self.foods_list if f['FoodID'] == food_id), None)
+        if not food:
+            return 0
+        
+        food_calories = float(food['Calories'])
+        food_quantity = float(food['Quantity'])
+        
+        if food_quantity <= 0:
+            return 0
+        
+        return food_calories / food_quantity
 
     def _score_food(self, food, remaining_calories, day_number):
         """
@@ -235,6 +302,7 @@ class MealPlanGenerator:
     def _calculate_quantity(self, food, target_calories):
         """
         Calculate quantity of food needed to reach target calories.
+        Handles high-density foods intelligently.
 
         Args:
             food (dict): Food item
@@ -249,10 +317,22 @@ class MealPlanGenerator:
         if food_calories <= 0:
             return 0
 
+        # Calculate: if food has 579 cal per 100g, and we need 625 cal
+        # quantity = (625 / 579) * 100 = 107.95g
         quantity = (target_calories / food_calories) * food_quantity
         
-        # Reasonable limits: 10-1000 grams or units
-        quantity = max(10, min(1000, quantity))
+        # Smart limits:
+        # - For normal foods (< 4 cal/gram): min 20g, max 500g
+        # - For dense foods (>= 4 cal/gram): min 5g, max 100g
+        
+        calories_per_gram = food_calories / food_quantity
+        
+        if calories_per_gram >= 4.0:
+            # Dense food (like oils, nuts, sweets): limit portions
+            quantity = max(5, min(100, quantity))
+        else:
+            # Normal food: standard limits
+            quantity = max(20, min(500, quantity))
         
         return round(quantity, 2)
 
